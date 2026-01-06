@@ -23,8 +23,8 @@ GAME_SRCS = $(GAME_DIR)/chess_board.c \
             $(GAME_DIR)/move_validator.c \
             $(GAME_DIR)/move_executor.c \
             $(GAME_DIR)/game_state.c \
-            $(GAME_DIR)/game_manager.c
-
+            $(GAME_DIR)/game_manager.c \
+            $(GAME_DIR)/game_chat.c
 TIMER_SRCS = $(TIMER_DIR)/timer.c
 
 HISTORY_SRCS = $(HISTORY_DIR)/history.c \

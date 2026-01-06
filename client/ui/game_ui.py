@@ -4,8 +4,10 @@ from network.poll_client import PollClient
 from ui.gamebot_ui import GameBotUI
 from ui.pvp_ui import PvPUI
 from ui.friend_ui import FriendUI
-from ui.login_ui import LoginUI
+from ui.login_ui import LoginUI, RegisterUI
+from ui.login_ui import LoginUI, RegisterUI, ForgotPasswordUI
 from ui.history_ui import HistoryUI
+from ui.leaderboard_ui import LeaderboardUI
 import sys
 import queue  # ← THÊM: Cho thread-safe message forwarding
 
@@ -41,6 +43,7 @@ class ChessApp:
 
         self.current_frame = None
         self.login_ui = None
+        self.register_ui = None
         self.pending_action = None
         self.pending_context = {}
         self.listeners = []
@@ -54,6 +57,13 @@ class ChessApp:
         if self.login_ui:
             self.login_ui.destroy()
             self.login_ui = None
+        if self.register_ui:
+            self.register_ui.destroy()
+            self.register_ui = None
+        # Clear status message
+        if hasattr(self, 'status_label'):
+            self.status_label.destroy()
+            delattr(self, 'status_label')
 
     def create_button(self, parent, text, command):
         return tk.Button(
@@ -83,18 +93,42 @@ class ChessApp:
     def login_frame(self):
         self.clear()
         self.login_ui = LoginUI(self.master, self.login, self.register)
+        self.login_ui.set_switch_callback(self.register_frame)
+        self.login_ui.set_forgot_callback(self.forgot_password_frame)
         self.current_frame = self.login_ui.frame
+    
+    def register_frame(self):
+        self.clear()
+        self.register_ui = RegisterUI(self.master, self.register, self.login_frame)
+        self.current_frame = self.register_ui.frame
+
+    def forgot_password_frame(self):
+        self.clear()
+        self.forgot_ui = ForgotPasswordUI(
+            self.master,
+            self.request_otp,
+            self.reset_password,
+            self.login_frame
+        )
+        self.current_frame = self.forgot_ui.frame
 
     def login(self, username, password):
         self.client.send(f"LOGIN|{username}|{password}\n")
         self.pending_action = "login"
         self.pending_context = {"username": username}
-        self.show_status("")
 
     def register(self, username, password, email):
         self.client.send(f"REGISTER|{username}|{password}|{email}\n")
         self.pending_action = "register"
-        self.show_status("")
+    # ===== Forgot Password =====
+    def request_otp(self, email):
+        self.client.send(f"FORGOT_PASSWORD|{email}\n")
+        self.pending_action = "forgot"
+        self.pending_context = {"email": email}
+
+    def reset_password(self, user_id, otp, new_password):
+        self.client.send(f"RESET_PASSWORD|{user_id}|{otp}|{new_password}\n")
+        self.pending_action = "reset_password"
 
     # ===== Main Menu =====
     def main_menu(self):
@@ -110,6 +144,7 @@ class ChessApp:
         self.create_button(frame, "Kết bạn", self.friend_request_frame).pack(pady=5)
         self.create_button(frame, "Chơi với Bot", self.start_bot_game).pack(pady=5)
         self.create_button(frame, "Xem lịch sử (History)", self.show_history).pack(pady=5)
+        self.create_button(frame, "Bảng xếp hạng", self.show_leaderboard).pack(pady=5)
         self.create_button(frame, "Logout", self.logout).pack(pady=(20, 0))
 
     # ===== Friend Request =====
@@ -123,17 +158,14 @@ class ChessApp:
         friend_id = self.friend_id_entry.get()
         self.client.send(f"FRIEND_REQUEST|{self.user_id}|{friend_id}\n")
         self.pending_action = "friend_request"
-        self.show_status("")
 
     def send_game_control(self, action):
         self.client.send(f"{action}|{self.user_id}\n")
         self.pending_action = "game_control"
-        self.show_status("")
 
     def logout(self):
         self.client.send(f"LOGOUT|{self.user_id}\n")
         self.pending_action = "logout"
-        self.show_status("")
 
     # ← SỬA: poll_server() – Forward qua queue nếu listener có message_queue (thread-safe)
     def poll_server(self):
@@ -141,7 +173,6 @@ class ChessApp:
             responses = self.client.poll()
         except ConnectionError as e:
             print("[Client] Server disconnected:", e)
-            self.show_status("Mất kết nối tới server")
             return  # ⛔ DỪNG POLLING NGAY
 
         for resp in responses:
@@ -162,7 +193,6 @@ class ChessApp:
         # Handle generic ERROR messages first
         if resp.startswith("ERROR|") and not self.pending_action:
             print(f"[Error from server] {resp}")
-            self.show_status(resp)
         
         if self.pending_action == "login":
             if resp.startswith("LOGIN_SUCCESS"):
@@ -170,25 +200,54 @@ class ChessApp:
                 self.user_id = int(resp.split('|')[1])
                 self.main_menu()
             elif resp.startswith("LOGIN_FAIL") or resp.startswith("ERROR"):
-                self.show_status("Login failed: " + resp)
+                print("Login failed: " + resp)
             self.pending_action = None
             self.pending_context = {}
         elif self.pending_action == "register":
             if resp.startswith("REGISTER_OK"):
-                self.show_status("Đăng ký thành công!")
+                # Hiển thông báo thành công rồi chuyển về login
+                if hasattr(self, 'register_ui') and self.register_ui:
+                    self.register_ui.show_success_and_redirect()
+                else:
+                    messagebox.showinfo("Thành công", "Đăng ký thành công! Vui lòng đăng nhập.")
+                    self.login_frame()
             else:
-                self.show_status("Register failed: " + resp)
+                print("Register failed: " + resp)
+            self.pending_action = None
+            self.pending_context = {}
+        elif self.pending_action == "forgot":
+            if resp.startswith("OTP_SENT"):
+                parts = resp.split('|')
+                if len(parts) >= 3 and hasattr(self, 'forgot_ui') and self.forgot_ui:
+                    user_id = int(parts[1])
+                    email = parts[2]
+                    self.forgot_ui.show_step2(user_id, email)
+                else:
+                    print("Đã gửi OTP.")
+            else:
+                print("Gửi OTP thất bại: " + resp)
+            self.pending_action = None
+            self.pending_context = {}
+        elif self.pending_action == "reset_password":
+            if resp.startswith("PASSWORD_RESET_OK"):
+                if hasattr(self, 'forgot_ui') and self.forgot_ui:
+                    self.forgot_ui.show_success_and_redirect()
+                else:
+                    messagebox.showinfo("Thành công", "Đặt lại mật khẩu thành công! Vui lòng đăng nhập.")
+                    self.login_frame()
+            else:
+                print("Đặt lại mật khẩu thất bại: " + resp)
             self.pending_action = None
             self.pending_context = {}
         elif self.pending_action == "friend_request":
             if resp.startswith("FRIEND_REQUESTED"):
-                self.show_status("Đã gửi lời mời kết bạn!")
+                print("Đã gửi lời mời kết bạn!")
             else:
-                self.show_status("Kết bạn thất bại: " + resp)
+                print("Kết bạn thất bại: " + resp)
             self.pending_action = None
             self.pending_context = {}
         elif self.pending_action == "game_control":
-            self.show_status(resp)
+            print(resp)
             self.pending_action = None
             self.pending_context = {}
         elif self.pending_action == "logout":
@@ -203,12 +262,12 @@ class ChessApp:
                 match_id = parts[1]
                 opponent_name = parts[2] if len(parts) > 2 else "Unknown"
                 color = parts[3] if len(parts) > 3 else "white"
-                self.show_status(f"Đã tìm thấy trận đấu! Đối thủ: {opponent_name}, Bạn chơi quân: {color}")
+                print(f"Đã tìm thấy trận đấu! Đối thủ: {opponent_name}, Bạn chơi quân: {color}")
                 self.pending_action = None
                 # Start PvP game UI
                 self.start_pvp_game(match_id, color, opponent_name)
             elif resp.startswith("MATCHMAKING_LEFT"):
-                self.show_status("Đã hủy tìm trận")
+                print("Đã hủy tìm trận")
                 self.pending_action = None
                 self.main_menu()
             elif resp.startswith("MATCHMAKING_QUEUED"):
@@ -216,7 +275,7 @@ class ChessApp:
                 if hasattr(self, 'matchmaking_status'):
                     self.matchmaking_status.config(text="Đang tìm đối thủ...")
             elif resp.startswith("ERROR"):
-                self.show_status("Lỗi matchmaking: " + resp)
+                print("Lỗi matchmaking: " + resp)
                 self.pending_action = None
 
         # ← THÊM: Xử lý BOT_MOVE_RESULT (nếu từ server, forward đến bot UI nếu đang chơi)
@@ -340,3 +399,27 @@ class ChessApp:
         self.history_ui = HistoryUI(self.master, self.user_id, self.client, self.main_menu)
         self.current_frame = self.history_ui.frame
         self.master.update_idletasks()
+
+    def show_leaderboard(self):
+        """Show leaderboard UI"""
+        self.clear()
+        try:
+            if sys.platform == "darwin":
+                self.master.attributes("-fullscreen", True)
+            elif sys.platform == "win32":
+                self.master.state("zoomed")
+            else:
+                self.master.attributes('-zoomed', True)
+        except:
+            self.master.geometry("1200x800")
+
+        self.leaderboard_ui = LeaderboardUI(self.master, self.client, self._back_from_leaderboard)
+        self.current_frame = self.leaderboard_ui.frame
+        self.add_listener(self.leaderboard_ui)
+        self.leaderboard_ui.refresh()
+        self.master.update_idletasks()
+
+    def _back_from_leaderboard(self):
+        if hasattr(self, 'leaderboard_ui') and self.leaderboard_ui:
+            self.remove_listener(self.leaderboard_ui)
+        self.main_menu()
