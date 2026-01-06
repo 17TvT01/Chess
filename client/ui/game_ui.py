@@ -40,6 +40,7 @@ class ChessApp:
         self.client = PollClient()
         self.username = None
         self.user_id = None
+        self.elo = 1200  # Default ELO
 
         self.current_frame = None
         self.login_ui = None
@@ -52,6 +53,10 @@ class ChessApp:
 
     # ===== Utilities =====
     def clear(self):
+        # Cleanup PvP UI if it exists
+        if hasattr(self, 'pvp_ui') and self.pvp_ui:
+            self.pvp_ui.destroy()
+            self.pvp_ui = None
         if self.current_frame:
             self.current_frame.destroy()
         if self.login_ui:
@@ -138,14 +143,16 @@ class ChessApp:
         self.current_frame = frame
 
         tk.Label(frame, text=f"Welcome, {self.username}", font=FONT_TITLE).pack(pady=(0, 10))
-        tk.Label(frame, text=f"Your ID: {self.user_id}", font=FONT_LABEL, fg="#666").pack(pady=(0, 20))
+        tk.Label(frame, text=f"Your ID: {self.user_id}", font=FONT_LABEL, fg="#666").pack(pady=(0, 5))
+        tk.Label(frame, text=f"ELO: {self.elo}", font=FONT_LABEL, fg="#4CAF50", 
+                 cursor="hand2").pack(pady=(0, 20))
 
-        self.create_button(frame, "Tìm trận (Matchmaking)", self.start_matchmaking).pack(pady=5)
+        self.create_button(frame, "Tìm trận", self.start_matchmaking).pack(pady=5)
         self.create_button(frame, "Kết bạn", self.friend_request_frame).pack(pady=5)
         self.create_button(frame, "Chơi với Bot", self.start_bot_game).pack(pady=5)
-        self.create_button(frame, "Xem lịch sử (History)", self.show_history).pack(pady=5)
+        self.create_button(frame, "Xem lịch sử", self.show_history).pack(pady=5)
         self.create_button(frame, "Bảng xếp hạng", self.show_leaderboard).pack(pady=5)
-        self.create_button(frame, "Logout", self.logout).pack(pady=(20, 0))
+        self.create_button(frame, "Đăng xuất", self.logout).pack(pady=(20, 0))
 
     # ===== Friend Request =====
     def friend_request_frame(self):
@@ -196,8 +203,15 @@ class ChessApp:
         
         if self.pending_action == "login":
             if resp.startswith("LOGIN_SUCCESS"):
+                parts = resp.split('|')
                 self.username = self.pending_context.get("username")
-                self.user_id = int(resp.split('|')[1])
+                self.user_id = int(parts[1])
+                # Parse ELO if available (format: LOGIN_SUCCESS|user_id|name|elo)
+                if len(parts) >= 4:
+                    try:
+                        self.elo = int(parts[3])
+                    except ValueError:
+                        self.elo = 1200  # Default if parsing fails
                 self.main_menu()
             elif resp.startswith("LOGIN_FAIL") or resp.startswith("ERROR"):
                 print("Login failed: " + resp)
@@ -334,7 +348,7 @@ class ChessApp:
         ).pack(padx=20, pady=10)
 
     def _back_to_menu_and_resize(self):
-        self.master.geometry("400x350")
+        self.master.geometry("600x500")
         self.main_menu()
 
     # ===== Matchmaking =====

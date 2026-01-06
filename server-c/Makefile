@@ -52,7 +52,9 @@ DB_SRCS = $(DB_DIR)/db_connection.c \
           $(DB_DIR)/db_matches.c \
           $(DB_DIR)/db_moves.c \
           $(DB_DIR)/db_stats.c \
-          $(DB_DIR)/db_users.c
+		  $(DB_DIR)/db_users.c \
+		  $(DB_DIR)/db_password_reset.c \
+		  $(DB_DIR)/email_helper.c
 
 ELO_SRCS = $(SRC_DIR)/elo/elo_calc.c \
            $(SRC_DIR)/elo/elo_history.c \

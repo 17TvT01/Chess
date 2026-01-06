@@ -34,6 +34,12 @@ class PvPUI:
         
         # Start timer
         self.start_timer()
+    
+    def destroy(self):
+        """Cleanup method to stop timers and destroy frame"""
+        self.stop_timer()
+        if hasattr(self, 'frame') and self.frame:
+            self.frame.destroy()
         
     def init_board(self):
         """Initialize standard chess board
@@ -339,6 +345,9 @@ class PvPUI:
         self.status_label.config(text="Draw offer sent")
     
     def back_to_menu(self):
+        # If game is not over, send surrender before leaving
+        if self.game_control.game_state != GameControlUI.STATE_GAME_OVER:
+            self.client.send(f"SURRENDER|{self.match_id}|{self.user_id}\n")
         self.frame.destroy()
         self.on_back()
     
@@ -349,7 +358,7 @@ class PvPUI:
 
         msg = msg.strip()
         print(f"[PvP] Received: {msg}")
-        
+
         # ================= CHAT MESSAGES =================
         if msg.startswith("GAME_CHAT_FROM"):
             parts = msg.split('|', 2)
@@ -567,8 +576,13 @@ class PvPUI:
     
     def update_timer_display(self):
         """Update timer labels"""
-        self.white_timer_label.config(text=f"White: {self.format_time(self.white_time)}")
-        self.black_timer_label.config(text=f"Black: {self.format_time(self.black_time)}")
+        try:
+            if self.white_timer_label.winfo_exists() and self.black_timer_label.winfo_exists():
+                self.white_timer_label.config(text=f"White: {self.format_time(self.white_time)}")
+                self.black_timer_label.config(text=f"Black: {self.format_time(self.black_time)}")
+        except tk.TclError:
+            # Widget has been destroyed, stop the timer
+            self.stop_timer()
     
     def start_timer(self):
         """Start the timer countdown"""

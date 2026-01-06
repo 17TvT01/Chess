@@ -180,29 +180,6 @@ void protocol_handle_command(ClientSession *session, const char *buffer, PGconn 
 
         register_bot_request(game_id, current_fen, bot_difficulty);
     }
-    const char *player_move = param2;
-    const char *bot_difficulty = param3;
-
-    GameMatch *match = game_manager_find_match(&game_manager, game_id);
-    if (!match) {
-        send(session->socket_fd, "ERROR|Game not found\n", 21, 0);
-        return;
-    }
-
-    pthread_mutex_lock(&match->lock);
-    int success = apply_player_move_on_board(match, player_move, session->user_id, db);
-    if (! success) {
-        pthread_mutex_unlock(&match->lock);
-        send(session->socket_fd, "ERROR|Invalid move\n", 19, 0);
-        return;
-    }
-
-    char current_fen[FEN_MAX_LENGTH];
-    chess_board_to_fen(&match->board, current_fen);
-    pthread_mutex_unlock(&match->lock);
-
-    register_bot_request(game_id, current_fen, bot_difficulty);
-    }
     // Friend
     else if (strcmp(command, "FRIEND_REQUEST") == 0) {
         handle_friend_request(session, num_params, param1, param2, db);
@@ -244,6 +221,8 @@ void protocol_handle_command(ClientSession *session, const char *buffer, PGconn 
         handle_rematch_accept(session, num_params, param1, param2, db);
     } else if (strcmp(command, "REMATCH_DECLINE") == 0) {
         handle_rematch_decline(session, num_params, param1, param2, db);
+    } else if (strcmp(command, "SURRENDER") == 0) {
+        handle_surrender(session, num_params, param1, param2, db);
     }
     // Matchmaking
     else if (strcmp(command, "JOIN_MATCHMAKING") == 0 && num_params >= 2) {
@@ -252,7 +231,7 @@ void protocol_handle_command(ClientSession *session, const char *buffer, PGconn 
         handle_leave_matchmaking(session, param1, db);
     } else if (strcmp(command, "MMJOIN") == 0 && num_params >= 4) {
         char payload[256];
-        snprintf(payload, sizeof(payload), "%s %s %s", param1, param2, param3);
+        snprintf(payload, sizeof(payload), "%.80s %.80s %.80s", param1, param2, param3);
         char resp[256];
         memset(resp, 0, sizeof(resp));
         handle_mmjoin(payload, resp, sizeof(resp));
