@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox
+from ui.notifications import show_result_overlay, show_toast
 from ui.gamecontrol_ui import GameControlUI
 from ui.game_chat_ui import GameChatUI
 
@@ -430,7 +431,11 @@ class PvPUI:
                 text="Game ended in a draw", fg="blue"
             )
             self.game_control.update_ui_by_state()
-            messagebox.showinfo("Game Over", "The game ended in a draw")
+            try:
+                self.client.send(f"GET_ELO_HISTORY|{self.user_id}\n")
+                self._pending_result_text = "Game ended in a draw"
+            except Exception:
+                show_toast(self.master, "Game ended in a draw", kind="info")
             return
 
         if msg.startswith("DRAW_DECLINED_BY_OPPONENT"):
@@ -479,7 +484,13 @@ class PvPUI:
                 text=f"{text} ({reason})", fg=color
             )
             self.game_control.update_ui_by_state()
-            messagebox.showinfo("Game Over", text)
+            # Request ELO history to show delta
+            try:
+                self.client.send(f"GET_ELO_HISTORY|{self.user_id}\n")
+                # Temporarily stash result text; overlay will be shown when ELO_HISTORY arrives
+                self._pending_result_text = text
+            except Exception:
+                show_toast(self.master, text, kind=("success" if color == "green" else "error"))
             return
 
         # ================= OPPONENT DISCONNECTED =================
@@ -491,7 +502,11 @@ class PvPUI:
                 text="You won! (Opponent disconnected)", fg="green"
             )
             self.game_control.update_ui_by_state()
-            messagebox.showinfo("Game Over", "You won!\nOpponent disconnected")
+            try:
+                self.client.send(f"GET_ELO_HISTORY|{self.user_id}\n")
+                self._pending_result_text = "You won! (Opponent disconnected)"
+            except Exception:
+                show_toast(self.master, "You won! (Opponent disconnected)", kind="success")
             return
 
         # ================= TIMER =================
@@ -499,6 +514,29 @@ class PvPUI:
             _, white_time, black_time = msg.split('|')
             self.white_timer_label.config(text=f"White: {self.format_time(int(white_time))}")
             self.black_timer_label.config(text=f"Black: {self.format_time(int(black_time))}")
+            return
+
+        # ================= ELO HISTORY RESPONSE =================
+        if msg.startswith("ELO_HISTORY|"):
+            parts = msg.strip().split('|')
+            try:
+                count = int(parts[1]) if len(parts) > 1 else 0
+            except ValueError:
+                count = 0
+            if count >= 1 and len(parts) >= 7:
+                # Latest entry: match_id, old_elo, new_elo, elo_change, date
+                old_elo = int(parts[3])
+                new_elo = int(parts[4])
+                elo_change = int(parts[5])
+                result_text = getattr(self, "_pending_result_text", "Kết thúc trận")
+                show_result_overlay(self.master, result_text, new_elo, elo_change)
+                # Clear pending
+                self._pending_result_text = None
+            else:
+                # No history yet
+                result_text = getattr(self, "_pending_result_text", "Kết thúc trận")
+                show_result_overlay(self.master, result_text, None, None)
+                self._pending_result_text = None
             return
 
         # ================= REMATCH =================

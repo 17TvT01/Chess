@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
+from ui.notifications import show_toast
 
 class FriendUI:
     def __init__(self, master, user_id, on_back, client):
@@ -156,25 +157,32 @@ class FriendUI:
             self.render_friend_requests(msg)
         elif msg.startswith("FRIEND_REQUESTED"):
             self.status_label.config(text="♟️ Đã gửi lời mời kết bạn!")
+            show_toast(self.master, "Gửi lời mời kết bạn thành công", kind="success")
             self.refresh()
         elif msg.startswith("FRIEND_ACCEPTED"):
             self.status_label.config(text="♞ Đã đồng ý kết bạn!")
+            show_toast(self.master, "Đã chấp nhận lời mời kết bạn", kind="success")
             self.refresh()
         elif msg.startswith("FRIEND_DECLINED"):
             self.status_label.config(text="♜ Đã từ chối lời mời!")
+            show_toast(self.master, "Đã từ chối lời mời kết bạn", kind="warning")
             self.refresh()
         elif msg.startswith("ERROR"):
             # Xử lý lỗi protocol trả về từ server
             msg_lower = msg.lower()
             if "friend request already exists" in msg_lower:
                 self.status_label.config(text="⚠️ Đã gửi lời mời kết bạn trước đó!")
+                show_toast(self.master, "Bạn đã gửi lời mời trước đó", kind="warning")
             elif "user not found" in msg_lower:
                 self.status_label.config(text="⚠️ Không tìm thấy người dùng này!")
+                show_toast(self.master, "ID không tồn tại", kind="error")
             elif "cannot add yourself" in msg_lower:
                 self.status_label.config(text="⚠️ Không thể kết bạn với chính mình!")
+                show_toast(self.master, "Không thể kết bạn với chính mình", kind="warning")
             else:
                 # Ẩn debug, chỉ hiện lỗi ngắn gọn
                 self.status_label.config(text="Lỗi: " + msg.split("|")[-1].split("[")[0])
+                show_toast(self.master, "Có lỗi xảy ra khi kết bạn", kind="error")
         elif msg.startswith("CHAT_FROM|"):
             parts = msg.strip().split("|", 2)
             print("[DEBUG] CHAT_FROM parts:", parts)  # Debug print for chat message parts

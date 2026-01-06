@@ -8,6 +8,7 @@ from ui.login_ui import LoginUI, RegisterUI
 from ui.login_ui import LoginUI, RegisterUI, ForgotPasswordUI
 from ui.history_ui import HistoryUI
 from ui.leaderboard_ui import LeaderboardUI
+from ui.notifications import show_toast
 import sys
 import queue  # ← THÊM: Cho thread-safe message forwarding
 
@@ -212,9 +213,12 @@ class ChessApp:
                         self.elo = int(parts[3])
                     except ValueError:
                         self.elo = 1200  # Default if parsing fails
+                # Toast success
+                show_toast(self.master, "Đăng nhập thành công", kind="success")
                 self.main_menu()
             elif resp.startswith("LOGIN_FAIL") or resp.startswith("ERROR"):
-                print("Login failed: " + resp)
+                # Show error toast
+                show_toast(self.master, "Thông tin tài khoản hoặc mật khẩu không chính xác", kind="error")
             self.pending_action = None
             self.pending_context = {}
         elif self.pending_action == "register":
@@ -223,7 +227,7 @@ class ChessApp:
                 if hasattr(self, 'register_ui') and self.register_ui:
                     self.register_ui.show_success_and_redirect()
                 else:
-                    messagebox.showinfo("Thành công", "Đăng ký thành công! Vui lòng đăng nhập.")
+                    show_toast(self.master, "Đăng ký thành công! Vui lòng đăng nhập.", kind="success")
                     self.login_frame()
             else:
                 print("Register failed: " + resp)
@@ -237,9 +241,9 @@ class ChessApp:
                     email = parts[2]
                     self.forgot_ui.show_step2(user_id, email)
                 else:
-                    print("Đã gửi OTP.")
+                    show_toast(self.master, "Đã gửi OTP", kind="success")
             else:
-                print("Gửi OTP thất bại: " + resp)
+                show_toast(self.master, "Gửi OTP thất bại", kind="error")
             self.pending_action = None
             self.pending_context = {}
         elif self.pending_action == "reset_password":
@@ -247,17 +251,17 @@ class ChessApp:
                 if hasattr(self, 'forgot_ui') and self.forgot_ui:
                     self.forgot_ui.show_success_and_redirect()
                 else:
-                    messagebox.showinfo("Thành công", "Đặt lại mật khẩu thành công! Vui lòng đăng nhập.")
+                    show_toast(self.master, "Đặt lại mật khẩu thành công! Vui lòng đăng nhập.", kind="success")
                     self.login_frame()
             else:
-                print("Đặt lại mật khẩu thất bại: " + resp)
+                show_toast(self.master, "Đặt lại mật khẩu thất bại", kind="error")
             self.pending_action = None
             self.pending_context = {}
         elif self.pending_action == "friend_request":
             if resp.startswith("FRIEND_REQUESTED"):
-                print("Đã gửi lời mời kết bạn!")
+                show_toast(self.master, "Gửi lời mời kết bạn thành công", kind="success")
             else:
-                print("Kết bạn thất bại: " + resp)
+                show_toast(self.master, "Gửi lời mời kết bạn thất bại", kind="error")
             self.pending_action = None
             self.pending_context = {}
         elif self.pending_action == "game_control":
