@@ -1,0 +1,123 @@
+# ============================
+# OS Files
+# ============================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ============================
+# IDE / Editor
+# ============================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ============================
+# Python
+# ============================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python build
+*.egg-info/
+*.egg
+dist/
+build/
+
+# ============================
+# Flask runtime files
+# ============================
+instance/
+*.log
+*.pid
+
+# ============================
+# Node / React
+# ============================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.yarn/
+.yarn-integrity
+*.tgz
+
+# React build artifacts
+build/
+dist/
+
+# ============================
+# Environment variables
+# ============================
+.env
+.env.local
+.env.*.local
+
+# ============================
+# C / GCC Build Files
+# ============================
+# Object files
+*.o
+
+# Compiled output
+server-c/bin/
+server-c/build/
+server-c/*.out
+server-c/*.exe
+server-c/*.a
+server-c/*.so
+
+# Make intermediates
+*.d
+
+# ============================
+# PostgreSQL / Database files
+# ============================
+*.sql~
+database/*.dump
+*.db
+*.sqlite3
+
+# ============================
+# Cache
+# ============================
+.cache/
+tmp/
+temp/
+
+# ============================
+# Unity (if exists)
+# ============================
+Library/
+Temp/
+Obj/
+Logs/
+UserSettings/
+MemoryCaptures/
+
+# ============================
+# Others
+# ============================
+/*.bak
+*.backup
+
+# Python
+__pycache__/
+*.pyc
+
+# C build
+server-c/bin/
+*.o

@@ -1,0 +1,172 @@
+CC = gcc
+# macOS (Homebrew) - comment out if on Linux
+#CFLAGS = -Wall -Wextra -g -Iinclude -I/usr/local/Cellar/postgresql@14/14.11_1/include/postgresql@14 -pthread
+#LDFLAGS = -L/usr/local/Cellar/postgresql@14/14.11_1/lib/postgresql@14 -lpq -lpthread -lm
+# Linux - uncomment if on Linux
+CFLAGS = -Wall -Wextra -g -Iinclude -I/usr/include/postgresql -pthread
+LDFLAGS = -L/usr/lib/x86_64-linux-gnu -lpq -lpthread -lm
+
+# Directories
+SRC_DIR = src
+GAME_DIR = $(SRC_DIR)/game
+TIMER_DIR = $(SRC_DIR)/timer
+HISTORY_DIR = $(SRC_DIR)/history
+PROTOCOL_DIR = $(SRC_DIR)/protocol
+SESSION_DIR = $(SRC_DIR)/session
+SERVER_DIR = $(SRC_DIR)/server
+DB_DIR = $(SRC_DIR)/db
+BUILD_DIR = build
+BIN_DIR = bin
+
+# Source files
+GAME_SRCS = $(GAME_DIR)/chess_board.c \
+            $(GAME_DIR)/move_validator.c \
+            $(GAME_DIR)/move_executor.c \
+            $(GAME_DIR)/game_state.c \
+            $(GAME_DIR)/game_manager.c
+
+TIMER_SRCS = $(TIMER_DIR)/timer.c
+
+HISTORY_SRCS = $(HISTORY_DIR)/history.c \
+               $(HISTORY_DIR)/history_handlers.c
+
+PROTOCOL_SRCS = $(PROTOCOL_DIR)/protocol_handler.c
+
+# New modular handler directories
+MATCH_DIR = $(SRC_DIR)/match
+BOT_DIR = $(SRC_DIR)/bot
+FRIEND_DIR = $(SRC_DIR)/friend
+CONTROL_DIR = $(SRC_DIR)/control
+
+MATCH_SRCS = $(MATCH_DIR)/match.c
+BOT_SRCS = $(BOT_DIR)/bot.c
+FRIEND_SRCS = $(FRIEND_DIR)/friend.c
+CONTROL_SRCS = $(CONTROL_DIR)/control.c
+
+SESSION_SRCS = $(SESSION_DIR)/client_session.c
+
+SERVER_SRCS = $(SERVER_DIR)/server_core.c \
+              $(SERVER_DIR)/online_users.c
+
+DB_SRCS = $(DB_DIR)/db_connection.c \
+          $(DB_DIR)/db_matches.c \
+          $(DB_DIR)/db_moves.c \
+          $(DB_DIR)/db_stats.c \
+          $(DB_DIR)/db_users.c
+
+ELO_SRCS = $(SRC_DIR)/elo/elo_calc.c \
+           $(SRC_DIR)/elo/elo_history.c \
+           $(SRC_DIR)/elo/elo_db.c \
+           $(SRC_DIR)/elo/elo_leaderboard.c
+
+LOGIN_DIR = $(SRC_DIR)/login
+LOGIN_SRCS = $(LOGIN_DIR)/login.c $(LOGIN_DIR)/logout.c $(LOGIN_DIR)/resgister.c
+
+MATCHMAKING_DIR = $(SRC_DIR)/matchmaking
+MATCHMAKING_SRCS = $(MATCHMAKING_DIR)/matchmaking.c
+
+CHAT_SRCS = $(SRC_DIR)/chat/chat.c
+
+MAIN_SRC = main.c
+
+ALL_SRCS = $(MAIN_SRC) $(GAME_SRCS) $(TIMER_SRCS) $(HISTORY_SRCS) $(PROTOCOL_SRCS) \
+           $(MATCH_SRCS) $(BOT_SRCS) $(FRIEND_SRCS) $(CONTROL_SRCS) \
+           $(SESSION_SRCS) $(SERVER_SRCS) $(DB_SRCS) $(ELO_SRCS) \
+           $(LOGIN_SRCS) $(MATCHMAKING_SRCS) $(CHAT_SRCS)
+
+# Object files
+OBJS = $(ALL_SRCS:%.c=$(BUILD_DIR)/%.o)
+
+# Target executables
+TARGET = $(BIN_DIR)/chess_server
+# CLIENT_TARGET = $(BIN_DIR)/chess_client
+
+# Default target
+all: directories $(TARGET)
+
+# Create directories
+directories:
+	@mkdir -p $(BUILD_DIR)
+	@mkdir -p $(BUILD_DIR)/src/game
+	@mkdir -p $(BUILD_DIR)/src/timer
+	@mkdir -p $(BUILD_DIR)/src/history
+	@mkdir -p $(BUILD_DIR)/src/protocol
+	@mkdir -p $(BUILD_DIR)/src/match
+	@mkdir -p $(BUILD_DIR)/src/bot
+	@mkdir -p $(BUILD_DIR)/src/friend
+	@mkdir -p $(BUILD_DIR)/src/control
+	@mkdir -p $(BUILD_DIR)/src/session
+	@mkdir -p $(BUILD_DIR)/src/server
+	@mkdir -p $(BUILD_DIR)/src/db
+	@mkdir -p $(BUILD_DIR)/src/elo
+	@mkdir -p $(BUILD_DIR)/src/login
+	@mkdir -p $(BUILD_DIR)/src/matchmaking
+	@mkdir -p $(BUILD_DIR)/src/chat
+
+	@mkdir -p $(BIN_DIR)
+
+# Link
+$(TARGET): $(OBJS)
+	@echo "Linking $@..."
+	$(CC) $(OBJS) -o $@ $(LDFLAGS)
+	@echo "Build complete! Executable: $(TARGET)"
+
+# Build client
+# $(CLIENT_TARGET): $(CLIENT_SRC)
+#	@echo "Building client..."
+#	$(CC) $(CFLAGS) $(CLIENT_SRC) -o $@ -pthread
+#	@echo "Client build complete! Executable: $(CLIENT_TARGET)"
+
+# Compile
+$(BUILD_DIR)/%.o: %.c
+	@echo "Compiling $<..."
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Clean
+clean:
+	@echo "Cleaning..."
+	rm -rf $(BUILD_DIR) $(BIN_DIR)
+	@echo "Clean complete"
+
+# Run server
+run: all
+	@echo "Starting server..."
+	./$(TARGET)
+
+# Run client
+run-client: $(CLIENT_TARGET)
+	@echo "Starting client..."
+	./$(CLIENT_TARGET)
+
+# Install dependencies (Ubuntu/Debian)
+install-deps:
+	@echo "Installing dependencies..."
+	sudo apt-get update
+	sudo apt-get install -y postgresql postgresql-contrib libpq-dev build-essential
+	@echo "Dependencies installed"
+
+# Setup database
+setup-db:
+	@echo "Setting up database..."
+	psql -U postgres -c "CREATE DATABASE chess_game;"
+	psql -U postgres -d chess_game -f ../database/schema.sql
+	@echo "Database setup complete"
+
+# Help
+help:
+	@echo "Chess Game Server - Makefile"
+	@echo ""
+	@echo "Targets:"
+	@echo "  all          - Build server (default)"
+	@echo "  clean        - Remove build files"
+	@echo "  run          - Build and run server"
+	@echo "  install-deps - Install system dependencies"
+	@echo "  setup-db     - Setup PostgreSQL database"
+	@echo "  help         - Show this help"
+	@echo ""
+	@echo "Usage:"
+	@echo "  make              # Build server"
+	@echo "  make clean        # Clean build files"
+	@echo "  make run          # Run server"
+
+.PHONY: all clean run install-deps setup-db help directories
