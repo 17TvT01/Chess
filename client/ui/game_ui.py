@@ -76,9 +76,18 @@ class ChessApp:
             parent,
             text=text,
             font=FONT_BUTTON,
-            width=20,
-            pady=5,
-            command=command
+            width=32,
+            height=2,
+            pady=3,
+            padx=10,
+            command=command,
+            relief=tk.FLAT,
+            bg="#3498db",
+            fg="white",
+            activebackground="#2980b9",
+            activeforeground="white",
+            cursor="hand2",
+            bd=0
         )
 
     def show_status(self, msg):
@@ -139,21 +148,63 @@ class ChessApp:
     # ===== Main Menu =====
     def main_menu(self):
         self.clear()
-        frame = tk.Frame(self.master, padx=20, pady=20)
-        frame.pack(expand=True)
+        frame = tk.Frame(self.master, bg="#ecf0f1")
+        frame.pack(expand=True, fill="both")
         self.current_frame = frame
 
-        tk.Label(frame, text=f"Welcome, {self.username}", font=FONT_TITLE).pack(pady=(0, 10))
-        tk.Label(frame, text=f"Your ID: {self.user_id}", font=FONT_LABEL, fg="#666").pack(pady=(0, 5))
-        tk.Label(frame, text=f"ELO: {self.elo}", font=FONT_LABEL, fg="#4CAF50", 
-                 cursor="hand2").pack(pady=(0, 20))
+        # Centered menu container with fixed size
+        container = tk.Frame(frame, bg="#ffffff", relief=tk.RAISED, bd=1, width=580, height=520)
+        container.pack(expand=True, padx=20, pady=20)
+        container.pack_propagate(False)  # Prevent resizing
+        
+        # Inner padding
+        inner = tk.Frame(container, bg="#ffffff", padx=18, pady=18)
+        inner.pack(fill="both", expand=True)
 
-        self.create_button(frame, "Tìm trận", self.start_matchmaking).pack(pady=5)
-        self.create_button(frame, "Kết bạn", self.friend_request_frame).pack(pady=5)
-        self.create_button(frame, "Chơi với Bot", self.start_bot_game).pack(pady=5)
-        self.create_button(frame, "Xem lịch sử", self.show_history).pack(pady=5)
-        self.create_button(frame, "Bảng xếp hạng", self.show_leaderboard).pack(pady=5)
-        self.create_button(frame, "Đăng xuất", self.logout).pack(pady=(20, 0))
+        # Main title
+        tk.Label(inner, text="MENU CHÍNH", font=("Helvetica", 20, "bold"), 
+                 bg="#ffffff", fg="#2c3e50").pack(pady=(0, 12))
+        
+        # User info box
+        info_box = tk.Frame(inner, bg="#ecf0f1", padx=10, pady=8, relief=tk.FLAT)
+        info_box.pack(fill="x", pady=(0, 12))
+        
+        tk.Label(info_box, text=f"Xin chào, {self.username}", font=("Helvetica", 11, "bold"), 
+                 bg="#ecf0f1", fg="#2c3e50").pack(anchor="w")
+        tk.Label(info_box, text=f"Mã số: {self.user_id}", font=("Helvetica", 9), 
+                 bg="#ecf0f1", fg="#7f8c8d").pack(anchor="w", pady=(1, 0))
+        tk.Label(info_box, text=f"♔ Điểm ELO: {self.elo}", font=("Helvetica", 10, "bold"), 
+                 bg="#ecf0f1", fg="#27ae60").pack(anchor="w", pady=(1, 0))
+
+        # Buttons container
+        buttons_frame = tk.Frame(inner, bg="#ffffff")
+        buttons_frame.pack(fill="both", expand=True)
+
+        self.create_button(buttons_frame, "⚔ Tìm Trận", self.start_matchmaking).pack(pady=3, fill="x")
+        self.create_button(buttons_frame, "♞ Kết Bạn", self.friend_request_frame).pack(pady=3, fill="x")
+        self.create_button(buttons_frame, "♚ Chơi Với Bot", self.start_bot_game).pack(pady=3, fill="x")
+        self.create_button(buttons_frame, "♜ Xem Lịch Sử", self.show_history).pack(pady=3, fill="x")
+        self.create_button(buttons_frame, "♛ Bảng Xếp Hạng", self.show_leaderboard).pack(pady=3, fill="x")
+        
+        # Logout button with different color
+        logout_btn = tk.Button(
+            buttons_frame,
+            text="↪ Đăng Xuất",
+            font=FONT_BUTTON,
+            width=32,
+            height=2,
+            pady=3,
+            padx=10,
+            command=self.logout,
+            relief=tk.FLAT,
+            bg="#e74c3c",
+            fg="white",
+            activebackground="#c0392b",
+            activeforeground="white",
+            cursor="hand2",
+            bd=0
+        )
+        logout_btn.pack(pady=(8, 0), fill="x")
 
     # ===== Friend Request =====
     def friend_request_frame(self):
@@ -336,20 +387,86 @@ class ChessApp:
             # CHỈ SEND – KHÔNG POLL
             self.client.send(f"MODE_BOT|{self.user_id}|{difficulty}\n")
 
+        # Create dialog window
         difficulty_window = tk.Toplevel(self.master)
-        difficulty_window.title("Chọn độ khó")
-
-        tk.Button(
-            difficulty_window,
-            text="Easy",
+        difficulty_window.title("Chọn Độ Khó Bot")
+        difficulty_window.geometry("400x400")
+        difficulty_window.resizable(False, False)
+        difficulty_window.configure(bg="#f0f0f0")
+        
+        # Center window
+        difficulty_window.transient(self.master)
+        difficulty_window.grab_set()
+        
+        # Title
+        title_frame = tk.Frame(difficulty_window, bg="#2c3e50", height=60)
+        title_frame.pack(fill="x")
+        tk.Label(
+            title_frame,
+            text="♟ Chọn Độ Khó",
+            font=("Helvetica", 16, "bold"),
+            bg="#2c3e50",
+            fg="white"
+        ).pack(pady=15)
+        
+        # Content frame
+        content = tk.Frame(difficulty_window, bg="#f0f0f0", padx=30, pady=20)
+        content.pack(fill="both", expand=True)
+        
+        tk.Label(
+            content,
+            text="Chọn mức độ khó của đối thủ máy:",
+            font=("Helvetica", 11),
+            bg="#f0f0f0",
+            fg="#333"
+        ).pack(pady=(0, 20))
+        
+        # Easy button
+        easy_btn = tk.Button(
+            content,
+            text=" Dễ ",
+            font=("Helvetica", 12, "bold"),
+            bg="#4CAF50",
+            fg="white",
+            activebackground="#45a049",
+            activeforeground="white",
+            width=25,
+            height=2,
+            cursor="hand2",
             command=lambda: on_select_difficulty("easy")
-        ).pack(padx=20, pady=10)
-
-        tk.Button(
-            difficulty_window,
-            text="Hard",
+        )
+        easy_btn.pack(pady=8)
+        
+        # Hard button
+        hard_btn = tk.Button(
+            content,
+            text=" Khó ",
+            font=("Helvetica", 12, "bold"),
+            bg="#f44336",
+            fg="white",
+            activebackground="#da190b",
+            activeforeground="white",
+            width=25,
+            height=2,
+            cursor="hand2",
             command=lambda: on_select_difficulty("hard")
-        ).pack(padx=20, pady=10)
+        )
+        hard_btn.pack(pady=8)
+        
+        # Cancel button
+        cancel_btn = tk.Button(
+            content,
+            text="Hủy",
+            font=("Helvetica", 10),
+            bg="#95a5a6",
+            fg="white",
+            activebackground="#7f8c8d",
+            activeforeground="white",
+            width=15,
+            cursor="hand2",
+            command=difficulty_window.destroy
+        )
+        cancel_btn.pack(pady=(15, 0))
 
     def _back_to_menu_and_resize(self):
         self.master.geometry("600x500")
@@ -414,9 +531,15 @@ class ChessApp:
         
         # Pass client to HistoryUI so it can use socket connection
         # HistoryUI(master, user_id, client, on_back)
-        self.history_ui = HistoryUI(self.master, self.user_id, self.client, self.main_menu)
+        self.history_ui = HistoryUI(self.master, self.user_id, self.client, self._back_from_history)
         self.current_frame = self.history_ui.frame
+        self.add_listener(self.history_ui)
         self.master.update_idletasks()
+
+    def _back_from_history(self):
+        if hasattr(self, 'history_ui') and self.history_ui:
+            self.remove_listener(self.history_ui)
+        self.main_menu()
 
     def show_leaderboard(self):
         """Show leaderboard UI"""

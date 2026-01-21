@@ -59,7 +59,9 @@ cd backend
 source venv/bin/activate   # Kích hoạt virtual environment
 python app.py
 
-api test là
+api test là 
+
+màn hình tìm trận đấu
 
 1. Request: Tạo trận đấu (POST /game/start)
 

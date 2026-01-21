@@ -261,6 +261,14 @@ void protocol_handle_command(ClientSession *session, const char *buffer, PGconn 
         int user_id = atoi(param1);
         elo_get_history(db, user_id, output, sizeof(output));
         send(session->socket_fd, output, strlen(output), 0);
+    }
+    // Game History
+    else if (strcmp(command, "GET_HISTORY") == 0) {
+        handle_get_history(session, param1, db);
+    } else if (strcmp(command, "GET_REPLAY") == 0) {
+        handle_get_replay(session, param1, db);
+    } else if (strcmp(command, "GET_STATS") == 0) {
+        handle_get_stats(session, param1, db);
     } else {
         char error[128];
         sprintf(error, "ERROR|Unknown command: %s\n", command);

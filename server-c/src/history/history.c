@@ -235,3 +235,107 @@ int stats_update_elo(PGconn *conn, int winner_id, int loser_id) {
     
     return 1;
 }
+
+// Award both players as if they won because the server stopped unexpectedly
+int stats_reward_server_crash(PGconn *conn, int user1_id, int user2_id) {
+    if (!db_check_connection(conn)) return 0;
+
+    // If neither side has a real user (e.g., bot match), nothing to do
+    if (user1_id <= 0 && user2_id <= 0) {
+        return 1;
+    }
+
+    char query[256];
+    if (user1_id > 0 && user2_id > 0 && user1_id != user2_id) {
+        snprintf(query, sizeof(query),
+                 "UPDATE users SET elo_point = elo_point + 30 WHERE user_id IN (%d,%d)",
+                 user1_id, user2_id);
+    } else {
+        int uid = (user1_id > 0) ? user1_id : user2_id;
+        snprintf(query, sizeof(query),
+                 "UPDATE users SET elo_point = elo_point + 30 WHERE user_id = %d",
+                 uid);
+    }
+
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "[DB] Server crash reward failed: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        return 0;
+    }
+
+    PQclear(res);
+
+    printf("[DB] Server crash reward: users %d and %d gained win ELO (+30)\n",
+           user1_id, user2_id);
+    return 1;
+}
+
+// Finish all matches that were left in PLAYING state after an unexpected server stop
+int history_recover_active_matches(PGconn *conn) {
+    if (!db_check_connection(conn)) return 0;
+
+    const char *query =
+        "SELECT mg.match_id, "
+        "COALESCE((SELECT user_id FROM match_player WHERE match_id = mg.match_id AND color = 'white'), 0) AS white_id, "
+        "COALESCE((SELECT user_id FROM match_player WHERE match_id = mg.match_id AND color = 'black'), 0) AS black_id "
+        "FROM match_game mg "
+        "WHERE mg.status = 'playing'";
+
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "[DB] Recover active matches failed: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        return 0;
+    }
+
+    int rows = PQntuples(res);
+    int recovered = 0;
+
+    for (int i = 0; i < rows; i++) {
+        int match_id = atoi(PQgetvalue(res, i, 0));
+        int white_id = atoi(PQgetvalue(res, i, 1));
+        int black_id = atoi(PQgetvalue(res, i, 2));
+
+        char update_match[256];
+        snprintf(update_match, sizeof(update_match),
+                 "UPDATE match_game SET status='finished', endtime=NOW(), result='aborted', winner_id=NULL "
+                 "WHERE match_id=%d",
+                 match_id);
+
+        PGresult *update_res = PQexec(conn, update_match);
+        if (PQresultStatus(update_res) != PGRES_COMMAND_OK) {
+            fprintf(stderr, "[DB] Failed to mark match %d as aborted after crash: %s\n",
+                    match_id, PQerrorMessage(conn));
+            PQclear(update_res);
+            continue;
+        }
+        PQclear(update_res);
+
+        // Give both players win-equivalent ELO because the server caused the interruption
+        if (white_id > 0 && black_id > 0) {
+            stats_reward_server_crash(conn, white_id, black_id);
+        } else if (white_id > 0 || black_id > 0) {
+            // Handle edge case where one side is missing (e.g., bot or NULL user)
+            stats_reward_server_crash(conn, white_id, black_id);
+        }
+
+        // Mark scores as 1 for both human players to keep history consistent
+        char update_score[256];
+        snprintf(update_score, sizeof(update_score),
+                 "UPDATE match_player SET score = 1 WHERE match_id = %d AND user_id IS NOT NULL",
+                 match_id);
+        PGresult *score_res = PQexec(conn, update_score);
+        PQclear(score_res);
+
+        recovered++;
+    }
+
+    PQclear(res);
+
+    if (recovered > 0) {
+        printf("[Recovery] Marked %d matches as aborted after crash and rewarded players\n", recovered);
+    }
+
+    return recovered;
+}

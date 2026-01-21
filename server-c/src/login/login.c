@@ -9,6 +9,33 @@
 // Khai báo prototype cho simple_hash để tránh lỗi implicit declaration
 unsigned long long simple_hash(const char *str);
 
+// Gửi thông báo xin lỗi và nhắc ELO đã được cộng nếu người chơi bị ảnh hưởng bởi sự cố tắt server
+static void notify_server_crash(ClientSession *session, PGconn *db) {
+    char query[512];
+    snprintf(query, sizeof(query),
+        "SELECT COUNT(*) FROM match_game mg "
+        "JOIN match_player mp ON mg.match_id = mp.match_id "
+        "WHERE mp.user_id = %d AND mg.result = 'aborted' "
+        "AND mg.endtime >= NOW() - INTERVAL '1 day'",
+        session->user_id);
+
+    PGresult *res = PQexec(db, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        PQclear(res);
+        return;
+    }
+
+    int count = atoi(PQgetvalue(res, 0, 0));
+    PQclear(res);
+
+    if (count > 0) {
+        const char *notice =
+            "SERVER_CRASH_NOTICE|Vì server bị đóng đột ngột chúng tôi rất xin lỗi sự bất tiện này. "
+            "Chúng tôi đã cộng ELO thắng cho cả hai người chơi.\n";
+        send(session->socket_fd, notice, strlen(notice), 0);
+    }
+}
+
 void handle_login(ClientSession *session, char *param1, char *param2, PGconn *db) {
     if (param1 == NULL || param2 == NULL || strlen(param1) == 0 || strlen(param2) == 0) {
         char error[] = "ERROR|Missing credentials\n";
@@ -65,6 +92,9 @@ void handle_login(ClientSession *session, char *param1, char *param2, PGconn *db
     char response[256];
     snprintf(response, sizeof(response), "LOGIN_SUCCESS|%d|%s|%s\n", user_id, name, elo);
     send(session->socket_fd, response, strlen(response), 0);
+
+    // Thông báo lỗi server nếu có trận bị dừng đột ngột
+    notify_server_crash(session, db);
 }
 
 void handle_register_validate(ClientSession *session, int num_params, char *param1, char *param2, char *param3, PGconn *db) {

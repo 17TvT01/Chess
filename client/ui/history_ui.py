@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
+from ui.notifications import show_toast
 
 class HistoryUI:
     """UI for viewing game history and replays via C Server socket"""
@@ -89,12 +90,50 @@ class HistoryUI:
             self.waiting_for_response = True
             self.response_type = "history"
             
-            # Start checking for response
-            self._check_history_response()
-            
         except Exception as e:
             self.status_label.config(text=f"Error: {str(e)}", fg="red")
             messagebox.showerror("Error", f"Failed to request history:\n{str(e)}")
+    
+    def handle_message(self, msg):
+        """Handle incoming messages from server"""
+        if msg.startswith("HISTORY|"):
+            # Parse history response
+            try:
+                import json
+                history_json = msg.split("|", 1)[1]
+                history_obj = json.loads(history_json)
+                self.history_data = history_obj.get("matches", [])
+                self.populate_history()
+                self.status_label.config(text=f"Loaded {len(self.history_data)} matches", fg="green")
+                show_toast(self.master, f"✓ Đã tải {len(self.history_data)} trận đấu", kind="success")
+                self.waiting_for_response = False
+            except Exception as e:
+                show_toast(self.master, f"✗ Lỗi phân tích dữ liệu: {str(e)}", kind="error")
+                self.waiting_for_response = False
+        elif msg.startswith("REPLAY|") and self.response_type == "replay":
+            # Parse replay response
+            try:
+                import json
+                replay_json = msg.split("|", 1)[1]
+                replay_data = json.loads(replay_json)
+                self.open_replay_window(self._replay_match_id, replay_data)
+                self.waiting_for_response = False
+                self.response_type = None
+            except Exception as e:
+                show_toast(self.master, f"✗ Lỗi phân tích replay: {str(e)}", kind="error")
+                self.waiting_for_response = False
+                self.response_type = None
+        elif msg.startswith("ERROR") and self.waiting_for_response:
+            # Parse error message
+            error_msg = msg.split("|", 1)[1] if "|" in msg else msg
+            if "no moves" in error_msg.lower():
+                show_toast(self.master, "⚠ Trận này không có nước đi (surrender ngay)", kind="warning")
+            elif "not found" in error_msg.lower():
+                show_toast(self.master, "✗ Không tìm thấy trận đấu", kind="error")
+            else:
+                show_toast(self.master, f"✗ {error_msg}", kind="error")
+            self.waiting_for_response = False
+            self.response_type = None
     
     def _check_history_response(self):
         """Check for history response from server"""
@@ -183,9 +222,6 @@ class HistoryUI:
             self.response_type = "replay"
             self._replay_match_id = match_id
             
-            # Start checking for response
-            self._check_replay_response()
-            
         except Exception as e:
             messagebox.showerror("Error", f"Failed to request replay:\n{str(e)}")
     
@@ -222,7 +258,7 @@ class HistoryUI:
         """Open a new window to show the replay"""
         replay_window = tk.Toplevel(self.master)
         replay_window.title(f"Replay - Match {match_id}")
-        replay_window.geometry("900x700")
+        replay_window.geometry("900x800")
         replay_window.configure(bg="#f0f0f0")
         
         ReplayViewer(replay_window, match_id, replay_data)

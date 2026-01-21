@@ -53,6 +53,7 @@ int history_create_bot_match(PGconn *conn, int user_id, const char *type);
 int history_save_move(PGconn *conn, int match_id, int user_id, const char *notation, const char *fen);
 int history_save_bot_move(PGconn *conn, int match_id, const char *notation, const char *fen);
 int history_update_match_result(PGconn *conn, int match_id, const char *result, int winner_id);
+int history_recover_active_matches(PGconn *conn);
 int history_get_user_matches(PGconn *conn, int user_id, MatchHistoryItem *items, int *count);
 
 // ============ REPLAY ============
@@ -62,6 +63,7 @@ int replay_validate_access(PGconn *conn, int match_id, int user_id);
 // ============ STATISTICS ============
 int stats_get_player_stats(PGconn *conn, int user_id, PlayerStats *stats);
 int stats_update_elo(PGconn *conn, int winner_id, int loser_id);
+int stats_reward_server_crash(PGconn *conn, int user1_id, int user2_id);
 
 // ============ HANDLERS ============
 void handle_history_request(PGconn *conn, int client_fd, int user_id);

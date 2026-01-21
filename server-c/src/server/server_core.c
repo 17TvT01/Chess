@@ -99,6 +99,9 @@ int server_init(PGconn **db_connection) {
         fprintf(stderr, "[Error] Failed to connect to database\n");
         return -1;
     }
+
+    // Finish matches that were left in PLAYING state because the server stopped unexpectedly
+    history_recover_active_matches(*db_connection);
     
     // Initialize game manager
     game_manager_init(&game_manager);
